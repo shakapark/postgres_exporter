@@ -238,6 +238,7 @@ var builtinMetricMaps = map[string]map[string]ColumnMapping{
 	},
 	"pg_stat_activity": {
 		"datname":         {LABEL, "Name of this database", nil, nil},
+		"usename":         {LABEL, "Name of this user", nil, nil},
 		"state":           {LABEL, "connection state", nil, semver.MustParseRange(">=9.2.0")},
 		"count":           {GAUGE, "number of connections in this state", nil, nil},
 		"max_tx_duration": {GAUGE, "max duration in seconds any active transaction has been running", nil, nil},
@@ -316,6 +317,7 @@ var queryOverrides = map[string][]OverrideQuery{
 			`
 			SELECT
 				pg_database.datname,
+				pg_database.usename,
 				tmp.state,
 				COALESCE(count,0) as count,
 				COALESCE(max_tx_duration,0) as max_tx_duration
@@ -332,11 +334,12 @@ var queryOverrides = map[string][]OverrideQuery{
 			(
 				SELECT
 					datname,
+					usename,
 					state,
 					count(*) AS count,
 					MAX(EXTRACT(EPOCH FROM now() - xact_start))::float AS max_tx_duration
-				FROM pg_stat_activity GROUP BY datname,state) AS tmp2
-				ON tmp.state = tmp2.state AND pg_database.datname = tmp2.datname
+				FROM pg_stat_activity GROUP BY datname,usename,state) AS tmp2
+				ON tmp.state = tmp2.state AND pg_database.usename = tmp2.usename AND pg_database.datname = tmp2.datname
 			`,
 		},
 		{
@@ -344,10 +347,11 @@ var queryOverrides = map[string][]OverrideQuery{
 			`
 			SELECT
 				datname,
+				usename,
 				'unknown' AS state,
 				COALESCE(count(*),0) AS count,
 				COALESCE(MAX(EXTRACT(EPOCH FROM now() - xact_start))::float,0) AS max_tx_duration
-			FROM pg_stat_activity GROUP BY datname
+			FROM pg_stat_activity GROUP BY datname,usename
 			`,
 		},
 	},
